@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>宁夏人均GDP专题地图</title>
+  <style>
+    html, body, #viewDiv {
+      padding: 0;
+      margin: 0;
+      height: 100%;
+      width: 100%;
+      font-family: "Microsoft YaHei", sans-serif;
+    }
+    
+    #header {
+      background: #2c3e50;
+      color: white;
+      padding: 10px 20px;
+      height: 60px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      display: flex;
+      align-items: center;
+    }
+    
+    #header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    
+    #container {
+      display: flex;
+      height: calc(100vh - 80px);
+    }
+    
+    #sidebar {
+      width: 280px;
+      background: #f5f7fa;
+      padding: 15px;
+      overflow-y: auto;
+      border-right: 1px solid #d1d5db;
+    }
+    
+    #viewDiv {
+      flex: 1;
+    }
+    
+    .widget-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #2c3e50;
+      margin: 15px 0 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #d1d5db;
+    }
+    
+    .widget-container {
+      background: white;
+      padding: 12px;
+      border-radius: 6px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-bottom: 15px;
+    }
+    
+    .sidebar-toggle {
+      position: absolute;
+      top: 70px;
+      left: 280px;
+      z-index: 1000;
+      background: white;
+      border: 1px solid #d1d5db;
+      border-left: none;
+      border-radius: 0 4px 4px 0;
+      padding: 8px;
+      cursor: pointer;
+    }
+    
+    .sidebar-collapsed #sidebar {
+      display: none;
+    }
+    
+    .sidebar-collapsed #viewDiv {
+      width: 100%;
+    }
+    
+    /* 坐标显示控件样式 */
+    .coordinate-widget {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 8px 12px;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+      font-size: 12px;
+      z-index: 100;
+    }
+  </style>
+  
+  <link rel="stylesheet" href="https://js.arcgis.com/4.25/esri/themes/light/main.css">
+  <script src="https://js.arcgis.com/4.25/"></script>
+</head>
+<body>
+  <div id="header">
+    <h1>宁夏人均GDP专题地图</h1>
+  </div>
+  
+  <div id="container">
+    <div id="sidebar">
+      <div class="widget-container">
+        <div class="widget-title">地图工具</div>
+        <div id="basemapGallery"></div>
+      </div>
+      
+      <div class="widget-container">
+        <div class="widget-title">图层控制</div>
+        <div id="layerList"></div>
+      </div>
+      
+      <div class="widget-container">
+        <div class="widget-title">图例</div>
+        <div id="legend"></div>
+      </div>
+    </div>
+    
+    <div id="viewDiv"></div>
+    <div class="sidebar-toggle" id="sidebarToggle">◀</div>
+    
+    <!-- 坐标显示控件 -->
+    <div class="coordinate-widget" id="coordinateWidget">
+      经度: 0.0000°<br>纬度: 0.0000°
+    </div>
+  </div>
+
+  <script>
+    require([
+      "esri/Map",
+      "esri/views/MapView",
+      "esri/widgets/BasemapGallery",
+      "esri/widgets/Expand",
+      "esri/layers/FeatureLayer",
+      "esri/widgets/Legend",
+      "esri/widgets/ScaleBar",
+      "esri/widgets/Search",
+      "esri/widgets/Home",
+      "esri/widgets/BasemapToggle",
+      "esri/widgets/Fullscreen",
+      "esri/widgets/LayerList",
+      "esri/renderers/SimpleRenderer",
+      "esri/symbols/SimpleFillSymbol",
+      "esri/smartMapping/statistics/summaryStatistics"
+    ], function(
+      Map, MapView, BasemapGallery, Expand, FeatureLayer, 
+      Legend, ScaleBar, Search, Home, BasemapToggle, 
+      Fullscreen, LayerList, SimpleRenderer, SimpleFillSymbol, summaryStatistics
+    ) {
+      
+      // 创建地图
+      const map = new Map({
+        basemap: "streets-navigation-vector"
+      });
+      
+      // 添加宁夏GDP图层
+      const nxGDPLayer = new FeatureLayer({
+        url: "https://www.geosceneonline.cn/server/rest/services/Hosted/宁夏各市生产总值及gdp/FeatureServer",
+        title: "宁夏各市GDP",
+        popupTemplate: {
+          title: "{市名}",
+          content: "GDP: {GDP_2022}亿元<br>增速: {同比增速}%"
+        }
+      });
+      
+      map.add(nxGDPLayer);
+      
+      // 创建视图（聚焦宁夏）
+      const view = new MapView({
+        container: "viewDiv",
+        map: map,
+        center: [106.2, 37.5], // 宁夏中心坐标
+        zoom: 7,
+        constraints: {
+          minZoom: 6,
+          maxZoom: 12
+        }
+      });
+      
+      // 添加比例尺
+      const scaleBar = new ScaleBar({
+        view: view,
+        unit: "metric"
+      });
+      view.ui.add(scaleBar, "bottom-left");
+      
+      // 添加搜索控件
+      const search = new Search({
+        view: view,
+        includeDefaultSources: false,
+        sources: [{
+          layer: nxGDPLayer,
+          searchFields: ["市名"],
+          displayField: "市名",
+          exactMatch: false,
+          outFields: ["*"],
+          name: "搜索宁夏各市",
+          placeholder: "输入城市名称",
+          zoomScale: 50000
+        }]
+      });
+      view.ui.add(search, {
+        position: "top-right",
+        index: 0
+      });
+      
+      // 添加图例
+      const legend = new Legend({
+        view: view,
+        container: "legend"
+      });
+      
+      // 创建底图库小工具
+      const basemapGallery = new BasemapGallery({
+        view: view,
+        container: "basemapGallery"
+      });
+      
+      // 添加其他工具
+      const homeBtn = new Home({
+        view: view
+      });
+      view.ui.add(homeBtn, "top-left");
+      
+      const basemapToggle = new BasemapToggle({
+        view: view,
+        nextBasemap: "hybrid"
+      });
+      view.ui.add(basemapToggle, "bottom-right");
+      
+      const fullscreen = new Fullscreen({
+        view: view
+      });
+      view.ui.add(fullscreen, "top-left");
+      
+      // 添加图层列表
+      const layerList = new LayerList({
+        view: view,
+        container: "layerList"
+      });
+      
+      // 侧边栏切换功能
+      const sidebarToggle = document.getElementById("sidebarToggle");
+      const container = document.getElementById("container");
+      
+      sidebarToggle.addEventListener("click", function() {
+        container.classList.toggle("sidebar-collapsed");
+        sidebarToggle.textContent = container.classList.contains("sidebar-collapsed") ? "▶" : "◀";
+      });
+      
+      // 添加坐标显示功能
+      const coordinateWidget = document.getElementById("coordinateWidget");
+      
+      // 鼠标移动时更新坐标
+      view.on("pointer-move", function(event) {
+        const point = view.toMap(event);
+        coordinateWidget.innerHTML = `经度: ${point.longitude.toFixed(4)}°<br>纬度: ${point.latitude.toFixed(4)}°`;
+      });
+      
+      // 地图移动时也更新坐标
+      view.watch("center", function(center) {
+        coordinateWidget.innerHTML = `经度: ${center.longitude.toFixed(4)}°<br>纬度: ${center.latitude.toFixed(4)}°`;
+      });
+      
+      // 地图加载完成后的一些操作
+      view.when(() => {
+        // 可以在这里添加地图加载完成后的其他操作
+      });
+    });
+  </script>
+</body>
+</html>
